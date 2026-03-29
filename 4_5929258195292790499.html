@@ -1,10 +1,44 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Current Date and Time</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Phone Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .phone {
+            width: 375px;
+            height: 667px;
+            border: 16px solid #333;
+            border-radius: 36px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        .screen {
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            border-radius: 30px;
+            overflow: hidden;
+            position: relative;
+        }
+        /* Additional styles for the interactive elements */
+    </style>
 </head>
 <body>
-    <h1>Current Date and Time (UTC)</h1>
-    <p>2026-03-29 17:20:16</p>
+    <div class="phone">
+        <div class="screen">
+            <h1>Welcome to the Interactive Phone Simulator!</h1>
+            <!-- Add interactive elements here -->
+        </div>
+    </div>
 </body>
 </html>
