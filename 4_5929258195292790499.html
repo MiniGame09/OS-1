@@ -1,44 +1,428 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Phone Simulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+        :root { 
+            --phone-pink: #fbc4ab; 
+            --grey-light: #f0f0f0; 
+            --anim-duration: 0.5s;
         }
-        .phone {
-            width: 375px;
-            height: 667px;
-            border: 16px solid #333;
-            border-radius: 36px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            position: relative;
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; display: flex; justify-content: center; align-items: center;
+            background-color: #323131; user-select: none; touch-action: none;
+            font-family: 'Roboto', sans-serif;
         }
-        .screen {
-            width: 100%;
-            height: 100%;
-            background-color: white;
-            border-radius: 30px;
-            overflow: hidden;
-            position: relative;
+        .phone-container { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        svg { max-width: 100%; max-height: 100%; filter: drop-shadow(0 30px 60px rgba(239, 232, 232, 0.356)); pointer-events: all; }
+
+        #screen-content { opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+        .screen-on #screen-content { opacity: 1; pointer-events: all; }
+
+        #wallpaper {
+            transition: transform 5s cubic-bezier(0.4, 0, 0.2, 1), filter 0.6s ease;
+            transform-origin: center center;
         }
-        /* Additional styles for the interactive elements */
+        .app-active #wallpaper, .cc-active #wallpaper { 
+            transform: scale(1.1); 
+            filter: blur(0px) brightness(0.3) 
+        }
+
+        #pages-container { 
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); 
+        }
+
+        .app-entity {
+            transition: x var(--anim-duration) cubic-bezier(0.6, -0, 0.1, 1),
+                        y var(--anim-duration) cubic-bezier(0.6, -0, 0.1, 1),
+                        width var(--anim-duration) cubic-bezier(0.6, -0, 0.1, 1),
+                        height var(--anim-duration) cubic-bezier(0.6, -0, 0.1, 1),
+                        rx var(--anim-duration) cubic-bezier(0.6, -0, 0.1, 1);
+            cursor: pointer;
+        }
+
+        .active-app-state .app-entity.is-active {
+            x: 25px !important; y: 25px !important; width: 400px !important; height: 880px !important; rx: 45px !important;
+        }
+
+        .app-icon {
+            pointer-events: none;
+            fill: none;
+            stroke: #444;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: opacity 0.2s ease;
+        }
+
+        .active-app-state .app-icon {
+            opacity: 0;
+        }
+
+        #boot-screen { display: block; opacity: 1; transition: opacity 0.8s ease; pointer-events: none; }
+        #lock-clock, #fingerprint-sensor-group, #ui-elements, #nav-bar, #status-bar-interactive { 
+            opacity: 0; pointer-events: none; transition: opacity 0.5s ease; 
+        }
+
+        .locked #lock-clock, .locked #fingerprint-sensor-group { opacity: 1; pointer-events: all; }
+        .unlocked #ui-elements, .unlocked #nav-bar, .unlocked #status-bar-interactive { opacity: 1; pointer-events: all; }
+        .boot-finished #boot-screen { opacity: 0; }
+
+        @keyframes progress-fill { from { width: 0; } to { width: 200px; } }
+        .start-progress #boot-progress-fill { animation: progress-fill 2s linear forwards; }
+
+        #control-center { transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1); transform: translateY(-930px); }
+        .cc-active #control-center { transform: translateY(0); }
+
+        .clickable { cursor: pointer; pointer-events: all; }
+        .nav-icon { stroke: black; stroke-width: 5; stroke-linecap: round; fill: none; opacity: 0.7; pointer-events: none; }
+        
+        #sb-time, #sb-bat-fill { fill: #1f1f1f; }
+        #sb-bat-stroke { stroke: #1f1f1f; }
+
+        @keyframes ripple-effect {
+            0% { transform: scale(1); opacity: 0; }
+            0% { opacity: 0; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+        .ripple-wave { fill: none; stroke: white; opacity: 0; transform-origin: 225px 750px; pointer-events: none; }
+        .rippling .ripple-wave { animation: ripple-effect 3.2s infinite ease-out; }
+
+        #display-brightness-layer { pointer-events: none; transition: opacity 0.2s linear; }
     </style>
 </head>
-<body>
-    <div class="phone">
-        <div class="screen">
-            <h1>Welcome to the Interactive Phone Simulator!</h1>
-            <!-- Add interactive elements here -->
-        </div>
+<body class="screen-off">
+
+    <div class="phone-container">
+        <svg viewBox="0 0 450 930" xmlns="http://www.w3.org/2000/svg" id="phone-svg">
+            <defs>
+                <clipPath id="screenClip">
+                    <rect x="23" y="25" width="405" height="885" rx="37" ry="37" />
+                </clipPath>
+                
+                <svg id="i-app" viewBox="0 0 24 24">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                </svg>
+                <svg id="i-phone" viewBox="0 0 24 24">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/> 
+                </svg>
+                <svg id="i-msg" viewBox="0 0 24 24">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                </svg>
+                <svg id="i-cam" viewBox="0 0 24 24">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+                <svg id="i-mail" viewBox="0 0 24 24">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </defs>
+
+            <rect x="10" y="10" width="430" height="910" rx="37" ry="37" fill="#ede8d0" />
+            <rect x="15" y="15" width="420" height="900" rx="37" ry="37" fill="#000" />
+
+            <g id="screen-content" clip-path="url(#screenClip)">
+                <image id="wallpaper" href="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=800" x="25" y="25" width="400" height="880" preserveAspectRatio="xMidYMid slice" />
+
+                <g id="ui-elements">
+                    <g id="pages-container" style="transform: translateX(0px)">
+                        
+                        <g id="page-search" transform="translate(-400, 0)">
+                            <rect x="65" y="120" width="320" height="45" rx="22.5" fill="var(--grey-light)" opacity="0.9" />
+                            <text x="100" y="148" font-size="16" fill="#666">Rechercher...</text>
+                            <rect class="app-entity clickable" data-id="4" x="68" y="175" width="320" height="220" rx="25" fill="var(--grey-light)" onclick="openApp('4', this)" />
+                            <rect class="app-entity clickable" data-id="5" x="68" y="410" width="320" height="220" rx="25" fill="var(--grey-light)" onclick="openApp('5', this)" />
+                            <rect class="app-entity clickable" data-id="6" x="68" y="645" width="320" height="220" rx="25" fill="var(--grey-light)" onclick="openApp('6', this)" />
+                        </g>
+
+                        <g id="page-home">
+                            <rect class="app-entity clickable" data-id="4" x="43" y="557" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('4', this)" />
+                            <use href="#i-mail" class="app-icon" x="63" y="577" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="5" x="133" y="557" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('5', this)" />
+                            <use href="#i-cam" class="app-icon" x="153" y="577" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="6" x="233" y="557" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('6', this)" />
+                            <use href="#i-app" class="app-icon" x="253" y="577" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="7" x="333" y="557" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('7', this)" />
+                            <use href="#i-app" class="app-icon" x="353" y="577" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="8" x="43" y="641" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('8', this)" />
+                            <use href="#i-app" class="app-icon" x="63" y="661" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="9" x="133" y="641" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('9', this)" />
+                            <use href="#i-app" class="app-icon" x="153" y="661" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="10" x="233" y="641" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('10', this)" />
+                            <use href="#i-app" class="app-icon" x="253" y="661" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="11" x="333" y="641" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('11', this)" />
+                            <use href="#i-app" class="app-icon" x="353" y="661" width="30" height="30" />
+                            
+                            <rect x="65" y="715" width="320" height="36" rx="18" fill="var(--grey-light)" />
+
+                            <rect data-id="1" x="43" y="765" width="70" height="70" rx="25" fill="var(--grey-light)" class="app-entity clickable" onclick="openApp('1', this)" />
+                            <use href="#i-phone" class="app-icon" x="63" y="785" width="30" height="30" />
+                            
+                            <rect data-id="2" x="133" y="765" width="70" height="70" rx="25" fill="var(--grey-light)" class="app-entity clickable" onclick="openApp('2', this)" />
+                            <use href="#i-msg" class="app-icon" x="153" y="785" width="30" height="30" />
+                            
+                            <rect data-id="3" x="233" y="765" width="70" height="70" rx="25" fill="var(--grey-light)" class="app-entity clickable" onclick="openApp('3', this)" />
+                            <use href="#i-mail" class="app-icon" x="253" y="785" width="30" height="30" />
+                            
+                            <rect data-id="4" x="333" y="765" width="70" height="70" rx="25" fill="var(--grey-light)" class="app-entity clickable" onclick="openApp('4', this)" />
+                            <use href="#i-app" class="app-icon" x="353" y="785" width="30" height="30" />
+                        </g>
+
+                        <g id="page-apps" transform="translate(400, 0)">
+                            <rect class="app-entity clickable" data-id="10" x="43" y="120" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('10', this)" />
+                            <use href="#i-app" class="app-icon" x="63" y="140" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="11" x="133" y="120" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('11', this)" />
+                            <use href="#i-app" class="app-icon" x="153" y="140" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="12" x="233" y="120" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('12', this)" />
+                            <use href="#i-app" class="app-icon" x="253" y="140" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="13" x="333" y="120" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('13', this)" />
+                            <use href="#i-app" class="app-icon" x="353" y="140" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="14" x="43" y="210" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('14', this)" />
+                            <use href="#i-app" class="app-icon" x="63" y="230" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="15" x="133" y="210" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('15', this)" />
+                            <use href="#i-app" class="app-icon" x="153" y="230" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="16" x="233" y="210" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('16', this)" />
+                            <use href="#i-app" class="app-icon" x="253" y="230" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="17" x="333" y="210" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('17', this)" />
+                            <use href="#i-app" class="app-icon" x="353" y="230" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="18" x="43" y="310" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('18', this)" />
+                            <use href="#i-app" class="app-icon" x="63" y="330" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="19" x="133" y="310" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('19', this)" />
+                            <use href="#i-app" class="app-icon" x="153" y="330" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="20" x="233" y="310" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('20', this)" />
+                            <use href="#i-app" class="app-icon" x="253" y="330" width="30" height="30" />
+                            
+                            <rect class="app-entity clickable" data-id="21" x="333" y="310" width="70" height="70" rx="25" fill="var(--grey-light)" onclick="openApp('21', this)" />
+                            <use href="#i-app" class="app-icon" x="353" y="330" width="30" height="30" />
+                        </g>
+                    </g>
+                </g>
+
+                <g id="boot-screen">
+                    <rect x="25" y="25" width="400" height="880" fill="black" />
+                    <g id="boot-logo">
+                        <circle cx="225" cy="465" r="50" fill="white" />
+                        <text x="225" y="485" text-anchor="middle" font-size="60" font-weight="900" fill="black">1</text>
+                    </g>
+                    <g id="boot-loader" style="display:none;">
+                        <rect x="125" y="460" width="200" height="10" rx="5" fill="#333" />
+                        <rect id="boot-progress-fill" x="125" y="460" width="0" height="10" rx="5" fill="white" />                    </g>
+                </g>
+
+                <text id="lock-clock" x="225" y="320" fill="white" font-size="110" font-weight="800" text-anchor="middle">12:45</text>
+                <g id="fingerprint-sensor-group">
+                    <circle cx="225" cy="690" r="35" fill="white" opacity="0.2" />
+                    <circle id="fingerprint-sensor" class="clickable" cx="225" cy="720" r="35" fill="transparent" 
+                            onmousedown="startUnlock()" onmouseup="stopUnlock()" ontouchstart="startUnlock()" ontouchend="stopUnlock()" />
+                </g>
+                              <g id="status-bar-interactive">
+                    <rect x="25" y="25" width="400" height="55" fill="transparent" class="clickable" onclick="toggleCC()" />
+                    <text x="55" y="62" id="sb-time" font-weight="600" font-size="16">12:45</text>
+                    <g transform="translate(360, 48)">
+                        <rect x="0" y="0" width="26" height="13" rx="5" fill="none" stroke="#1f1f1f" stroke-width="1.5" />
+                        <rect x="0" y="0" width="24" height="13" rx="5" fill="#1f1f1f" />
+                    </g>
+                </g>
+
+                <g id="nav-bar">
+                    <g class="clickable" transform="translate(100, 868)" onclick="closeAny()">
+                        <rect width="40" height="30" fill="transparent" />
+                        <line x1="10" y1="5" x2="10" y2="20" class="nav-icon" />
+                        <line x1="20" y1="2" x2="20" y2="23" class="nav-icon" />
+                        <line x1="30" y1="5" x2="30" y2="20" class="nav-icon" />
+                    </g>
+                    <g class="clickable" transform="translate(205, 868)" onclick="handleHome()">
+                        <rect width="40" height="30" fill="transparent" />
+                        <circle cx="20" cy="12.5" r="9" class="nav-icon" />
+                    </g>
+                    <g class="clickable" transform="translate(310, 868)" onclick="closeAny()">
+                        <rect width="50" height="40" fill="transparent" />
+                        <path d="M25 4 L15 12.5 L25 21" class="nav-icon" stroke-width="3" />
+                    </g>
+                </g>
+
+                <g id="control-center">
+                    <rect x="25" y="25" width="400" height="880" fill="white" fill-opacity="0.96" />
+                    <g transform="translate(360, 50)" class="clickable" onclick="toggleCC()">
+                        <circle cx="15" cy="15" r="15" fill="#eee" />
+                        <path d="M10 10 L20 20 M20 10 L10 20" stroke="#1f1f1f" stroke-width="2" />
+                    </g>
+                    <text x="55" y="110" font-size="24" font-weight="700" fill="#1f1f1f">Centre de Contrôle</text>
+                    <g transform="translate(55, 160)">
+                        <rect width="160" height="80" rx="24" fill="#c2e7ff" /><text x="80" y="45" text-anchor="middle" font-weight="500" fill="#1f1f1f">Internet</text>
+                        <rect x="180" width="160" height="80" rx="24" fill="#c2e7ff" /><text x="260" y="45" text-anchor="middle" font-weight="500" fill="#1f1f1f">Bluetooth</text>
+                   </g>
+                    <g transform="translate(55, 420)">
+                        <rect id="bright-track" width="340" height="50" rx="25" fill="#eee" class="clickable" onmousedown="startBright(event)" ontouchstart="startBright(event)" />
+                        <rect id="brightness-fill" width="220" height="50" rx="25" fill="#1f1f1f" pointer-events="none" />
+                    </g>
+                </g>
+
+                <rect id="display-brightness-layer" x="25" y="25" width="400" height="880" fill="black" opacity="0" />
+            </g>
+
+            <circle cx="225" cy="55" r="15" fill="#000" /> 
+            <rect id="btn-power" x="435" y="190" width="10" height="114" rx="8" fill="#ede8d0" class="clickable" onclick="handlePower()" />
+            <rect id="btn-power" x="435" y="330" width="10" height="70" rx="8" fill="#ede8d0" class="clickable" onclick="handlePower()" />
+        </svg>
     </div>
+
+    <script>
+        const body = document.body;
+        let isBooted = false, isPowerOn = false, isLocked = true, isCCActive = false;
+        let currentPage = 1, activeAppId = null;
+
+        let startX = 0;
+        let isDragging = false;
+        let swipeCooldown = false;
+        const screenArea = document.getElementById('screen-content');
+
+        function handlePower() {
+            if (!isBooted && !isPowerOn) {
+                isPowerOn = true; body.classList.add('screen-on');
+                setTimeout(() => {
+                    document.getElementById('boot-logo').style.display = 'none';
+                    document.getElementById('boot-loader').style.display = 'block';
+                    document.getElementById('boot-progress-fill').style.animation = 'progress-fill 4s linear forwards';
+                }, 1000);
+                setTimeout(() => {
+                    isBooted = true; body.classList.add('boot-finished', 'locked');
+                }, 5500);
+            } else {
+                isPowerOn = !isPowerOn;
+                if (isPowerOn) {
+                    body.classList.add('screen-on');
+                    isLocked = true; body.classList.replace('unlocked', 'locked');
+                    currentPage = 1; updatePage();
+                    closeAny();
+                } else body.classList.remove('screen-on');
+            }
+        }
+
+        let unlockTimer;
+        function startUnlock() {
+            if (!isPowerOn || !isLocked) return;
+            document.getElementById('fingerprint-sensor-group').classList.add('rippling');
+            unlockTimer = setTimeout(() => {
+                isLocked = false;
+                body.classList.replace('locked', 'unlocked');
+                document.getElementById('fingerprint-sensor-group').classList.remove('rippling');
+            }, 150);
+        }
+        function stopUnlock() {
+            document.getElementById('fingerprint-sensor-group').classList.remove('rippling');
+            clearTimeout(unlockTimer);
+        }
+
+        function handleSwipeStart(clientX) {
+            if (isLocked || !isPowerOn || activeAppId || isCCActive) return;
+            startX = clientX;
+            isDragging = true;
+        }
+
+        function handleSwipeEnd(clientX) {
+            if (!isDragging) return;
+            isDragging = false;
+            let diff = clientX - startX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0 && currentPage > 0) currentPage--;
+                else if (diff < 0 && currentPage < 2) currentPage++;
+                updatePage();
+            }
+        }
+
+        screenArea.addEventListener('mousedown', e => handleSwipeStart(e.clientX));
+        screenArea.addEventListener('mouseup', e => handleSwipeEnd(e.clientX));
+        screenArea.addEventListener('mouseleave', e => handleSwipeEnd(e.clientX));
+
+        screenArea.addEventListener('touchstart', e => handleSwipeStart(e.touches[0].clientX));
+        screenArea.addEventListener('touchend', e => handleSwipeEnd(e.changedTouches[0].clientX));
+
+        screenArea.addEventListener('wheel', e => {
+            if (isLocked || !isPowerOn || activeAppId || isCCActive || swipeCooldown) return;
+            if (Math.abs(e.deltaX) > 30) {
+                if (e.deltaX < 0 && currentPage > 0) currentPage--;
+                else if (e.deltaX > 0 && currentPage < 2) currentPage++;
+                updatePage();
+                swipeCooldown = true;
+                setTimeout(() => swipeCooldown = false, 500);
+            }
+        });
+
+        function updatePage() {
+            document.getElementById('pages-container').style.transform = `translateX(${(1 - currentPage) * 400}px)`;
+        }
+
+        function openApp(id, el) {
+            if (isLocked || isCCActive || activeAppId) return;
+            activeAppId = id;
+            el.classList.add('is-active');
+            body.classList.add('active-app-state', 'app-active');
+        }
+
+        function closeAny() {
+            const el = document.querySelector('.app-entity.is-active');
+            if (el) el.classList.remove('is-active');
+            body.classList.remove('active-app-state', 'app-active');
+            activeAppId = null;
+            if (isCCActive) toggleCC();
+        }
+
+        function handleHome() {
+            if (activeAppId) closeAny();
+            else { currentPage = 1; updatePage(); }
+        }
+
+        function toggleCC() {
+            if (!isPowerOn || isLocked) return;
+            isCCActive = !isCCActive;
+            body.classList.toggle('cc-active');
+        }
+
+        function startBright(e) {
+            const move = (ev) => {
+                const rect = document.getElementById('bright-track').getBoundingClientRect();
+                const cx = (ev.touches) ? ev.touches[0].clientX : ev.clientX;
+                let x = cx - rect.left;
+                x = Math.max(0, Math.min(340, x));
+                document.getElementById('brightness-fill').setAttribute('width', x);
+                document.getElementById('display-brightness-layer').style.opacity = 0.8 * (1 - (x / 340));
+            };
+            window.addEventListener('mousemove', move);
+            window.addEventListener('touchmove', move);
+            window.addEventListener('mouseup', () => { window.removeEventListener('mousemove', move); }, {once:true});
+            window.addEventListener('touchend', () => { window.removeEventListener('touchmove', move); }, {once:true});
+            move(e);
+        }
+
+        setInterval(() => {
+            const now = new Date();
+            const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+            document.querySelectorAll('#lock-clock, #sb-time').forEach(t => t.textContent = time);
+        }, 1000);
+    </script>
 </body>
 </html>
